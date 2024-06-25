@@ -1,0 +1,15 @@
+{
+    "domain": "hejiaqin",
+    "name": "HeJiaQin integration",
+    "codeowners": ["@cx3Y"],
+    "config_flow": true,
+    "dependencies": ["http", "network"],
+    "documentation": "https://github.com/cx3Y/hejiaqin",
+    "integration_type": "device",
+    "iot_class": "cloud_polling",
+    "issue_tracker": "https://github.com/cx3Y/hejiaqin/issues",
+    "requirements": [
+    ],
+    "version": "0.1.0"
+}
+  
