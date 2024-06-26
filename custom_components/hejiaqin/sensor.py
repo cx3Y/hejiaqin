@@ -62,7 +62,6 @@ SENSOR_TYPES = {
         state_class=SensorStateClass.MEASUREMENT,
         suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         suggested_display_precision=DEFAULT_PRECISION,
-        entity_registry_visible_default=False,
     ),
     "electricity_hour": SensorEntityDescription(
         key="electricity_hour",
