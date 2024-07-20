@@ -216,6 +216,14 @@ class PlugAPI(HTTPRequest):
         resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
         return resp
     
+    async def async_set_status_by_name(self, decice_id, name, status):
+        headers = self.headers.copy()
+        headers['Content-Type'] = "application/json"
+        data = data = {"deviceId":decice_id,"parameters":{"param":[{"name": name, "content": status}]}}
+
+        resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
+        return resp
+
     async def async_add_timer(self, decice_id, timer):
         #{"time": 2023, "repeat": 0, "enable": 1, "action": 0}
         #%257B%2522time%2522%253A2023%252C%2522repeat%2522%253A0%252C%2522enable%2522%253A1%252C%2522action%2522%253A0%257D

@@ -58,7 +58,7 @@ SENSOR_TYPES = {
         key="power_consumption",
         translation_key="power_consumption",
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.CURRENT,
+        device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         suggested_display_precision=DEFAULT_PRECISION,
@@ -164,6 +164,10 @@ class SunLoginHaSensor(SensorEntity, RestoreEntity):
         self._coordinator = device.update_manager.coordinator
         self.entity_id = f"{ENTITY_DOMAIN}.{self.device._unique_id}_{self.dp_id}"
 
+        if description is None:
+            # del self._attr_has_entity_name
+            del self.entity_description
+            self._attr_name = sensorid
         _LOGGER.debug("Initialized sensor [%s]", self.entity_id)
 
     @property

@@ -142,10 +142,10 @@ class HejiaqinConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         devices = {}
         for dev in self.device_list:
-            device_type = dev.get('type', 'unknow')
+            device_type = dev.get('type')
             device_id = dev.get('id')
 
-            if device_type == 590384 and device_id is not None: #and dev.get('connected', True)
+            if device_type is not None and device_id is not None: #and dev.get('connected', True)
                 dev[CONF_API_KEY] = user_input[CONF_API_KEY]
                 devices[device_id] = dev
         

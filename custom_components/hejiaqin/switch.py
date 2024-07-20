@@ -131,7 +131,11 @@ class SunLoginHaSwitch(SwitchEntity, RestoreEntity):
         self.entity_description = description
         self._coordinator = device.update_manager.coordinator
         self.entity_id = f"{ENTITY_DOMAIN}.{self.device._unique_id}_{self.dp_id}"
-
+        
+        if description is None:
+            # del self._attr_has_entity_name
+            del self.entity_description
+            self._attr_name = switchid
         if (remark := device.memos.get(switchid)) is not None:
             self._attr_name = remark
 

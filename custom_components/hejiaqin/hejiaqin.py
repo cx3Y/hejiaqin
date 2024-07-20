@@ -74,8 +74,6 @@ UPDATE_FLAG_SN = 'update_flag_sn'
 UPDATE_FLAG_IP = 'update_flag_ip'
 UPDATE_FLAG_VERSION = 'update_flag_version'
 
-ELECTRIC_MODEL = ["C1-2", "C2", "C2_BLE", "C2-BLE", "P1", "P1Pro", "P4", "P8", "P8Pro"]   #, "SunLogin generic"
-NO_ELECTRIC_MODEL = ["C1", "C1Pro", "C1Pro_BLE", "C1Pro-BLE", "P2"]
 DP_RELAY_0 = "relay0"
 DP_RELAY_1 = "relay1"
 DP_RELAY_2 = "relay2"
@@ -165,19 +163,21 @@ def device_filter(device_list, api_key):
         device_type = dev.get('type', 'unknow')
         device_id = dev.get('id')
 
-        if device_type == 590384 and device_id is not None: #and dev.get('connected', True)
+        if device_type is not None and device_id is not None: #and dev.get('connected', True)
             dev[CONF_API_KEY] = api_key
             devices[device_id] = dev
 
     return devices
 
-def get_hejiaqin_device(hass, config):
+async def get_hejiaqin_device(hass, config):
     # model = config.get(CONF_DEVICE_MODEL)
     type_id = config.get(CONF_DEVICE_TYPE)
     if type_id == 590384:
         return X1S(hass, config)
     else:
-        pass
+        device = UnkownDevice(hass, config)
+        await device.async_get_detail()
+        return device
 
 def get_plug_memos(config):
     memos = dict()
@@ -376,9 +376,11 @@ class Plug(HejiaqinDevice, ABC):
             resp = await self.api.async_set_default(self.unique_id, status)
         elif dp_id == DP_CHILDREN_LOCK:
             resp = await self.api.async_set_children_lock(self.unique_id, status)
-        else:
+        elif 'relay' in dp_id:
             index = int(dp_id[-1])
             resp = await self.api.async_set_status(self.unique_id, index, status)
+        else:
+            resp = await self.api.async_set_status_by_name(self.unique_id, dp_id, status)
 
         r_json = resp.json()
         if not r_json["resultCode"]:
@@ -469,6 +471,7 @@ class X1S(Plug):
 
     @property
     def memos(self):
+        return dict()
         return {DP_RELAY_0: self.name}
     
     async def async_restore_electricity(self):
@@ -497,7 +500,80 @@ class X1S(Plug):
         """Send a request to the device."""
 
       
+class UnkownDevice(Plug):
 
+    def __init__(self, hass, config):
+        self.hass = hass
+        self.config = config
+        self.sn = config.get(CONF_DEVICE_SN)
+        self._entities = list()
+        self._status = dict()
+        self.new_data = dict()
+        self.update_flag = list()
+        self.api_key = config.get(CONF_API_KEY)
+        self.api = PlugAPI(self.hass, self.api_key)
+        # self.api.api_key = self.api_key
+        _LOGGER.debug(self.api_key)
+        _LOGGER.debug(self.api.api_key)
+        self.update_manager = P2UpdateManager(self)
+    
+    @property
+    def manufacturer(self):
+        return "HEJIAQIN"
+    
+    @property
+    def model(self):
+        return self.config.get('deviceModel', 'HJQ generic')
+
+    @property
+    def entities(self):       
+        return self.config.get('entities', dict())
+
+    @property
+    def memos(self):
+        return dict()
+        return {DP_RELAY_0: self.name}
+    
+    async def async_get_detail(self):
+        resp = await self.api.async_get_detail(self.unique_id)
+        r_json = resp.json()
+        data = r_json.get('device', dict())
+        self.config["deviceModel"] = data.get('deviceModel')
+        entities = dict()
+        parameters = data.get('parameters', list())
+        for param in parameters:
+            name = param.get('name')
+            value = param.get('value')
+            if name in ['XData', 'firmware', 'softVersion'] or name is None or value is None: continue
+            value = str(value)
+            _LOGGER.debug(value)
+            _LOGGER.debug(len(value.split('.')))
+            if len(value.split('.')) == 1:
+                if entities.get('switch') is None:
+                    entities['switch'] = list()
+                entities["switch"].append(name)
+            else:
+                if entities.get('sensor') is None:
+                    entities['sensor'] = list()
+                entities["sensor"].append(name)
+        _LOGGER.debug(entities)
+        self.config["entities"] = entities
+
+
+    async def async_setup(self) -> bool:
+        """Set up the device and related entities."""
+        # config = self.config
+        _LOGGER.debug("in device async_setup")
+        
+        self.update_flag.append(UPDATE_FLAG_VERSION)
+
+        _LOGGER.debug("out device async_setup!!!!")
+        return True
+    
+    async def async_request(self, *args, **kwargs):
+        """Send a request to the device."""
+
+      
 
 
 class HejiaqinUpdateManager(ABC):
@@ -582,7 +658,6 @@ class HejiaqinUpdateManager(ABC):
 class P1UpdateManager(HejiaqinUpdateManager):
     "Plug with electric"
 
-    last_power_consumes_update = datetime.fromtimestamp(0, timezone.utc)
     error_flag = 0
 
     async def async_process_update_flag(self, *args):
@@ -601,7 +676,7 @@ class P1UpdateManager(HejiaqinUpdateManager):
             resp = await api.async_get_detail(device_id)
             _LOGGER.debug(f"{self.device.name} (GET_DETAIL): {resp.text}")
             r_json = resp.json()
-            status_data = r_json.get('device', list())
+            status_data = r_json.get('device', dict())
             status.update(plug_status_process(status_data))
             status.update(plug_electric_process(status_data))
             await self.async_process_update_flag(status_data)
@@ -618,7 +693,51 @@ class P1UpdateManager(HejiaqinUpdateManager):
             raise requests.exceptions.ConnectionError
         return status
 
-       
+class P2UpdateManager(HejiaqinUpdateManager):
+    "Plug without electric"
+
+    error_flag = 0
+
+    async def async_process_update_flag(self, *args):
+        if UPDATE_FLAG_VERSION in self.device.update_flag:
+            await self.device.async_update_fw_version(*args)
+
+    async def async_fetch_data(self):
+        """Fetch data from the device."""
+
+        device_id = self.device.unique_id
+        api = self.device.api
+        status = self.device._status
+        # if value := self.coordinator.data is not None:
+        #     status.update(value)
+        try:
+            resp = await api.async_get_detail(device_id)
+            _LOGGER.debug(f"{self.device.name} (GET_DETAIL): {resp.text}")
+            r_json = resp.json()
+            status_data = r_json.get('device', dict())
+            parameters = status_data.get('parameters', list())
+            for param in parameters:
+                name = param.get('name')
+                value = param.get('value')
+                if name in ['XData', 'firmware', 'softVersion'] or name is None or value is None: continue
+                _value = str(value)
+                if len(_value.split('.')) == 1:
+                    status[name] = int(value)
+                elif len(_value.split('.')) == 2:
+                    status[name] = float(value)
+            await self.async_process_update_flag(status_data)
+            self.device._available = status_data.get('connected')
+            # status.update(plug_power_consumes_process(r_json))
+        except: 
+            self.error_flag += 1
+        
+        _LOGGER.debug(f"{self.device.name}: {self.device._status}")
+
+        self.UPDATE_COUNT += 1
+        if self.error_flag > 0:
+            self.error_flag = 0
+            raise requests.exceptions.ConnectionError
+        return status       
 
 class DNSUpdateManger():
 
