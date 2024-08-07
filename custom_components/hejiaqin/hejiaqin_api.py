@@ -160,7 +160,7 @@ class PlugAPI(HTTPRequest):
         self.hass = hass
         self.api_key = api_key
         self.session = get_session(self.hass)
-        self.async_set_status = self.async_set_outlet_status
+        self.async_set_status = self.async_set_power_status
     
     @property
     def api_key(self):
@@ -196,7 +196,7 @@ class PlugAPI(HTTPRequest):
     async def async_set_power_status(self, decice_id, index, status):
         headers = self.headers.copy()
         headers['Content-Type'] = "application/json"
-        data = {"deviceId":decice_id,"parameters":{"param":[{"name": "powerSwitch", "index": index, "content": status}]}}
+        data = {"deviceId":decice_id,"parameters":{"param":[{"name": "powerSwitch", "content": status}]}}
 
         resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
         return resp

@@ -475,6 +475,7 @@ class X1S(Plug):
         self.update_flag = list()
         self.api_key = config.get(CONF_API_KEY)
         self.api = PlugAPI(self.hass, self.api_key)
+        self.api.async_set_status = self.api.async_set_outlet_status
         # self.api.api_key = self.api_key
         _LOGGER.debug(self.api_key)
         _LOGGER.debug(self.api.api_key)
@@ -546,7 +547,6 @@ class SP5F_CNA(Plug):
         self.update_flag = list()
         self.api_key = config.get(CONF_API_KEY)
         self.api = PlugAPI(self.hass, self.api_key)
-        self.api.async_set_status = self.api.async_set_power_status
         # self.api.api_key = self.api_key
         _LOGGER.debug(self.api_key)
         _LOGGER.debug(self.api.api_key)
