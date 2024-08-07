@@ -240,7 +240,7 @@ def plug_electric_process(data):
         value = dev_status.get('value')
         if (key := dp_id.get(name)) is not None and value is not None:
             status[key] = float(value)
-            
+
     if ((status.get(DP_VOLTAGE) is not None
         and status.get(DP_CURRENT) is not None)
         and status.get(DP_POWER) is None
@@ -546,6 +546,7 @@ class SP5F_CNA(Plug):
         self.update_flag = list()
         self.api_key = config.get(CONF_API_KEY)
         self.api = PlugAPI(self.hass, self.api_key)
+        self.api.async_set_status = self.api.async_set_power_status
         # self.api.api_key = self.api_key
         _LOGGER.debug(self.api_key)
         _LOGGER.debug(self.api.api_key)
