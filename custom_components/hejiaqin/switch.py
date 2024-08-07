@@ -32,6 +32,18 @@ SWITCH_TYPES = {
         device_class=SwitchDeviceClass.SWITCH,
         entity_registry_visible_default=False,
     ),
+    "current_protect": SwitchEntityDescription(
+        key="current_protect",
+        translation_key="current_protect",
+        device_class=SwitchDeviceClass.SWITCH,
+        entity_registry_visible_default=False,
+    ),
+    "voltage_protect": SwitchEntityDescription(
+        key="voltage_protect",
+        translation_key="voltage_protect",
+        device_class=SwitchDeviceClass.SWITCH,
+        entity_registry_visible_default=False,
+    ),
     "relay0": SwitchEntityDescription(
         key="relay0",
         translation_key="relay0",

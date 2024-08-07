@@ -1,6 +1,9 @@
 {
     "entity":{
         "sensor": {
+            "ip_address":{
+                "name":"IP地址"
+            },
             "power":{
                 "name":"当前功率"
             },
@@ -200,6 +203,12 @@
         "switch": {
             "led":{
                 "name":"指示灯"
+            },
+            "current_protect":{
+                "name":"过流保护"
+            },
+            "voltage_protect":{
+                "name":"过压保护"
             },
             "def_st":{
                 "name":"断电记忆"

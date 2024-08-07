@@ -1,6 +1,9 @@
 {
     "entity":{
         "sensor": {
+            "ip_address":{
+                "name":"IP Address"
+            },
             "power":{
                 "name":"Power"
             },
@@ -200,6 +203,12 @@
         "switch": {
             "led":{
                 "name":"Led"
+            },
+            "current_protect":{
+                "name":"Over Current Protect"
+            },
+            "voltage_protect":{
+                "name":"Over Current Protect"
             },
             "def_st":{
                 "name":"Default"

@@ -160,6 +160,7 @@ class PlugAPI(HTTPRequest):
         self.hass = hass
         self.api_key = api_key
         self.session = get_session(self.hass)
+        self.async_set_status = self.async_set_outlet_status
     
     @property
     def api_key(self):
@@ -184,14 +185,38 @@ class PlugAPI(HTTPRequest):
         resp = await self.async_make_request_by_requests("GET", DETAIL_URL, data=data, headers=self.headers)
         return resp
 
-    async def async_set_status(self, decice_id, index, status):
+    async def async_set_outlet_status(self, decice_id, index, status):
         headers = self.headers.copy()
         headers['Content-Type'] = "application/json"
         data = {"deviceId":decice_id,"parameters":{"param":[{"name": "outletStatus", "index": index, "content": status}]}}
 
         resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
         return resp
+    
+    async def async_set_power_status(self, decice_id, index, status):
+        headers = self.headers.copy()
+        headers['Content-Type'] = "application/json"
+        data = {"deviceId":decice_id,"parameters":{"param":[{"name": "powerSwitch", "index": index, "content": status}]}}
 
+        resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
+        return resp
+    
+    async def async_set_current_protect(self, decice_id, status):
+        headers = self.headers.copy()
+        headers['Content-Type'] = "application/json"
+        data = data = {"deviceId":decice_id,"parameters":{"param":[{"name": "overCurrentProtect", "content": status}]}}
+
+        resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
+        return resp
+    
+    async def async_set_voltage_protect(self, decice_id, status):
+        headers = self.headers.copy()
+        headers['Content-Type'] = "application/json"
+        data = data = {"deviceId":decice_id,"parameters":{"param":[{"name": "overVoltageProtect", "content": status}]}}
+
+        resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
+        return resp
+    
     async def async_set_led(self, decice_id, status):
         headers = self.headers.copy()
         headers['Content-Type'] = "application/json"

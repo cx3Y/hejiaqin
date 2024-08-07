@@ -87,6 +87,9 @@ DP_DEFAULT = "def_st"
 DP_REMOTE = "remote"
 DP_RELAY = "response"
 DP_CHILDREN_LOCK = "children_lock"
+DP_CURRENT_PROTECT = "current_protect"
+DP_VOLTAGE_PROTECT = "voltage_protect"
+DP_IP_ADDRESS = "ip_address"
 DP_ELECTRIC = "electric"
 DP_POWER = "power"
 DP_CURRENT = "current"
@@ -102,6 +105,8 @@ PLATFORM_OF_ENTITY = {
     DP_LED: "switch",
     DP_DEFAULT: "switch",
     DP_CHILDREN_LOCK: "switch",
+    DP_CURRENT_PROTECT: "switch",
+    DP_VOLTAGE_PROTECT: "switch",
     DP_RELAY_0: "switch",
     DP_RELAY_1: "switch",
     DP_RELAY_2: "switch",
@@ -121,6 +126,7 @@ PLATFORM_OF_ENTITY = {
     DP_ELECTRICITY_WEEK: "sensor",
     DP_ELECTRICITY_MONTH: "sensor",
     DP_ELECTRICITY_LASTMONTH: "sensor",
+    DP_IP_ADDRESS: "sensor",
 }
 ELECTRIC_ENTITY = [DP_POWER_CONSUMPTION, DP_POWER, DP_CURRENT, DP_VOLTAGE]
 SLOT_X_WITHOUT_ELECTRIC = [DP_LED, DP_DEFAULT, DP_CHILDREN_LOCK, DP_RELAY_0, DP_RELAY_1, DP_RELAY_2, DP_RELAY_3, DP_RELAY_4, DP_RELAY_5, DP_RELAY_6, DP_RELAY_7]
@@ -174,6 +180,8 @@ async def get_hejiaqin_device(hass, config):
     type_id = config.get(CONF_DEVICE_TYPE)
     if type_id == 590384:
         return X1S(hass, config)
+    elif type_id == 590505:
+        return SP5F_CNA(hass, config)
     else:
         device = UnkownDevice(hass, config)
         await device.async_get_detail()
@@ -207,6 +215,9 @@ def plug_status_process(data):
         "signalLight": DP_LED, 
         "pwCutMemory": DP_DEFAULT, 
         "outletStatus": DP_RELAY_0,
+        "powerSwitch": DP_RELAY_0,
+        "overCurrentProtect": DP_CURRENT_PROTECT,
+        "overVoltageProtect": DP_VOLTAGE_PROTECT,
     }
     for dev_status in data.get('parameters', ''):
         name = dev_status.get('name','_')
@@ -229,6 +240,24 @@ def plug_electric_process(data):
         value = dev_status.get('value')
         if (key := dp_id.get(name)) is not None and value is not None:
             status[key] = float(value)
+            
+    if ((status.get(DP_VOLTAGE) is not None
+        and status.get(DP_CURRENT) is not None)
+        and status.get(DP_POWER) is None
+    ):
+        status[DP_POWER] = status[DP_VOLTAGE] * status[DP_CURRENT]
+    return status
+
+def plug_info_process(data):
+    status = dict()
+    dp_id = {
+        "ipAddress": DP_IP_ADDRESS,
+    }
+    for dev_status in data.get('parameters', ''):
+        name = dev_status.get('name','_')
+        value = dev_status.get('value')
+        if (key := dp_id.get(name)) is not None and value is not None:
+            status[key] = value
 
     return status
 
@@ -376,6 +405,10 @@ class Plug(HejiaqinDevice, ABC):
             resp = await self.api.async_set_default(self.unique_id, status)
         elif dp_id == DP_CHILDREN_LOCK:
             resp = await self.api.async_set_children_lock(self.unique_id, status)
+        elif dp_id == DP_CURRENT_PROTECT:
+            resp = await self.api.async_set_current_protect(self.unique_id, status)
+        elif dp_id == DP_VOLTAGE_PROTECT:
+            resp = await self.api.async_set_voltage_protect(self.unique_id, status)
         elif 'relay' in dp_id:
             index = int(dp_id[-1])
             resp = await self.api.async_set_status(self.unique_id, index, status)
@@ -402,6 +435,7 @@ class Plug(HejiaqinDevice, ABC):
                 name = dev_status.get('name','_')
                 value = dev_status.get('value')
                 if name == 'firmware' and value is not None:
+                    value = value.replace('Version','').replace('version','').replace('V','').replace('v','')
                     self.fw_version = value
                     self.pop_update_flag(UPDATE_FLAG_VERSION)
                     await self.async_update()
@@ -499,7 +533,79 @@ class X1S(Plug):
     async def async_request(self, *args, **kwargs):
         """Send a request to the device."""
 
-      
+
+class SP5F_CNA(Plug):
+
+    def __init__(self, hass, config):
+        self.hass = hass
+        self.config = config
+        self.sn = config.get(CONF_DEVICE_SN)
+        self._entities = list()
+        self._status = dict()
+        self.new_data = dict()
+        self.update_flag = list()
+        self.api_key = config.get(CONF_API_KEY)
+        self.api = PlugAPI(self.hass, self.api_key)
+        # self.api.api_key = self.api_key
+        _LOGGER.debug(self.api_key)
+        _LOGGER.debug(self.api.api_key)
+        self.update_manager = P1UpdateManager(self)
+    
+    @property
+    def manufacturer(self):
+        return "BroadLink"
+    
+    @property
+    def model(self):
+        return "SP5F-CNA"
+
+    @property
+    def entities(self):
+        entities = SLOT_X_WITH_ELECTRIC.copy()
+        entities = [DP_CURRENT_PROTECT, DP_VOLTAGE_PROTECT, DP_IP_ADDRESS] + entities
+        entities = entities[:-7]
+        platform_entities = {}
+        
+        for dp_id in entities:
+            platform = PLATFORM_OF_ENTITY[dp_id]
+            if platform_entities.get(platform) is None:
+                platform_entities[platform] = [dp_id]
+            else:
+                platform_entities[platform].append(dp_id)
+            
+        return platform_entities
+
+    @property
+    def memos(self):
+        return dict()
+        return {DP_RELAY_0: self.name}
+    
+    async def async_restore_electricity(self):
+        _LOGGER.debug("in async_restore_electricity")
+        for dp_id in ELECTRIC_ENTITY[:-3]:
+            entity = self.get_entity(f"{self._unique_id}_{dp_id}")
+            last_state = await entity.async_get_last_state()
+            if last_state is not None and isinstance(last_state.state, (int, float)):
+                self._status.update({dp_id: last_state.state})
+                    
+        _LOGGER.debug("out async_restore_electricity")
+
+    async def async_setup(self) -> bool:
+        """Set up the device and related entities."""
+        # config = self.config
+        _LOGGER.debug("in device async_setup")
+
+        await self.async_restore_electricity()
+        
+        self.update_flag.append(UPDATE_FLAG_VERSION)
+
+        _LOGGER.debug("out device async_setup!!!!")
+        return True
+    
+    async def async_request(self, *args, **kwargs):
+        """Send a request to the device."""
+
+        
 class UnkownDevice(Plug):
 
     def __init__(self, hass, config):
@@ -679,6 +785,7 @@ class P1UpdateManager(HejiaqinUpdateManager):
             status_data = r_json.get('device', dict())
             status.update(plug_status_process(status_data))
             status.update(plug_electric_process(status_data))
+            status.update(plug_info_process(status_data))
             await self.async_process_update_flag(status_data)
             self.device._available = status_data.get('connected')
             # status.update(plug_power_consumes_process(r_json))

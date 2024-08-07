@@ -26,6 +26,11 @@ _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PRECISION = 3
 SENSOR_TYPES = {
+    "ip_address": SensorEntityDescription(
+        key="ip_address",
+        translation_key="ip_address",
+        entity_registry_visible_default=False,
+    ),
     "power": SensorEntityDescription(
         key="power",
         translation_key="power",
