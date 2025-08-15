@@ -182,6 +182,8 @@ async def get_hejiaqin_device(hass, config):
         return X1S(hass, config)
     elif type_id == 590505:
         return SP5F_CNA(hass, config)
+    elif type_id == 590693:
+        return SPB9010W(hass, config)
     else:
         device = UnkownDevice(hass, config)
         await device.async_get_detail()
@@ -213,6 +215,7 @@ def plug_status_process(data):
     dp_id = {
         "childrenLock":DP_CHILDREN_LOCK, 
         "signalLight": DP_LED, 
+        "energy": DP_LED,
         "pwCutMemory": DP_DEFAULT, 
         "outletStatus": DP_RELAY_0,
         "powerSwitch": DP_RELAY_0,
@@ -477,8 +480,8 @@ class X1S(Plug):
         self.api = PlugAPI(self.hass, self.api_key)
         self.api.async_set_status = self.api.async_set_outlet_status
         # self.api.api_key = self.api_key
-        _LOGGER.debug(self.api_key)
-        _LOGGER.debug(self.api.api_key)
+        # _LOGGER.debug(self.api_key)
+        # _LOGGER.debug(self.api.api_key)
         self.update_manager = P1UpdateManager(self)
     
     @property
@@ -548,8 +551,8 @@ class SP5F_CNA(Plug):
         self.api_key = config.get(CONF_API_KEY)
         self.api = PlugAPI(self.hass, self.api_key)
         # self.api.api_key = self.api_key
-        _LOGGER.debug(self.api_key)
-        _LOGGER.debug(self.api.api_key)
+        # _LOGGER.debug(self.api_key)
+        # _LOGGER.debug(self.api.api_key)
         self.update_manager = P1UpdateManager(self)
     
     @property
@@ -606,7 +609,78 @@ class SP5F_CNA(Plug):
     async def async_request(self, *args, **kwargs):
         """Send a request to the device."""
 
+
+class SPB9010W(Plug):
+
+    def __init__(self, hass, config):
+        self.hass = hass
+        self.config = config
+        self.sn = config.get(CONF_DEVICE_SN)
+        self._entities = list()
+        self._status = dict()
+        self.new_data = dict()
+        self.update_flag = list()
+        self.api_key = config.get(CONF_API_KEY)
+        self.api = PlugAPI(self.hass, self.api_key)
+        self.api.async_set_status = self.api.async_set_outlet_status
+        self.api.async_set_led = self.api.async_set_energy
+        # self.api.api_key = self.api_key
+        self.update_manager = P1UpdateManager(self)
+    
+    @property
+    def manufacturer(self):
+        return "PHILIPS"
+    
+    @property
+    def model(self):
+        return "SPB9010W"
+
+    @property
+    def entities(self):
+        entities = SLOT_X_WITH_ELECTRIC.copy()
+        entities = entities[:-7]
+        platform_entities = {}
         
+        for dp_id in entities:
+            platform = PLATFORM_OF_ENTITY[dp_id]
+            if platform_entities.get(platform) is None:
+                platform_entities[platform] = [dp_id]
+            else:
+                platform_entities[platform].append(dp_id)
+            
+        return platform_entities
+
+    @property
+    def memos(self):
+        return dict()
+        return {DP_RELAY_0: self.name}
+    
+    async def async_restore_electricity(self):
+        _LOGGER.debug("in async_restore_electricity")
+        for dp_id in ELECTRIC_ENTITY[:-3]:
+            entity = self.get_entity(f"{self._unique_id}_{dp_id}")
+            last_state = await entity.async_get_last_state()
+            if last_state is not None and isinstance(last_state.state, (int, float)):
+                self._status.update({dp_id: last_state.state})
+                    
+        _LOGGER.debug("out async_restore_electricity")
+
+    async def async_setup(self) -> bool:
+        """Set up the device and related entities."""
+        # config = self.config
+        _LOGGER.debug("in device async_setup")
+
+        await self.async_restore_electricity()
+        
+        self.update_flag.append(UPDATE_FLAG_VERSION)
+
+        _LOGGER.debug("out device async_setup!!!!")
+        return True
+    
+    async def async_request(self, *args, **kwargs):
+        """Send a request to the device."""
+
+
 class UnkownDevice(Plug):
 
     def __init__(self, hass, config):

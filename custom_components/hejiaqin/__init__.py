@@ -22,6 +22,8 @@ from homeassistant.const import (
     CONF_IP_ADDRESS,
     EVENT_HOMEASSISTANT_STOP,
     SERVICE_RELOAD,
+    MAJOR_VERSION,
+    MINOR_VERSION,    
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.components.http import HomeAssistantView
@@ -102,6 +104,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     _LOGGER.debug(entry.entry_id)
     _LOGGER.debug(entry.data)
     _LOGGER.debug(hass.data[DOMAIN][CONF_RELOAD_FLAG])
+    ha_version = MAJOR_VERSION * 100 + MINOR_VERSION
     if entry.entry_id in hass.data[DOMAIN][CONF_RELOAD_FLAG]:
         await async_hejiaqin_reload_entry(hass, entry)
 
@@ -124,12 +127,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             # await device.async_setup()
 
 
-        await asyncio.gather(
-            *[
-                hass.config_entries.async_forward_entry_setup(entry, platform)
-                for platform in ['switch','sensor']
-            ]
-        )
+        if ha_version >= 202408:
+            await hass.config_entries.async_forward_entry_setups(entry, ['switch','sensor'])
+        else:
+            await asyncio.gather(
+                *[
+                    hass.config_entries.async_forward_entry_setup(entry, platform)
+                    for platform in ['switch','sensor']
+                ]
+            )
+
 
         # await dns_update.coordinator.async_config_entry_first_refresh()
         for device in config[SL_DEVICES]:

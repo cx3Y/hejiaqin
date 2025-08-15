@@ -146,7 +146,15 @@ class CloudAPI(HTTPRequest):
         headers = HEADERS.copy()
         headers[HEAD_AUTH] = api_key
         # _LOGGER.debug(headers)
-        resp = await self.async_make_request_by_requests("GET", DEVICES_URL, headers=headers)
+        data = {
+            # "checkPersistent": True,
+            # "getAndMuCamera": True,
+            # "getHyRouter": True,
+            # "getShared": True,
+            # "getSharedFamily": True,
+            # "getSource": True,
+        }
+        resp = await self.async_make_request_by_requests("GET", DEVICES_URL, headers=headers, data=data)
         # _LOGGER.debug(resp.headers)
         return resp
         #https://andlink.komect.com/espapi/v3/cloud/json/family/devices/parameters/get?deviceId=CMCC-590384-xxxxxx
@@ -161,6 +169,7 @@ class PlugAPI(HTTPRequest):
         self.api_key = api_key
         self.session = get_session(self.hass)
         self.async_set_status = self.async_set_power_status
+        self.async_set_led = self.async_set_signal_light
     
     @property
     def api_key(self):
@@ -217,10 +226,18 @@ class PlugAPI(HTTPRequest):
         resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
         return resp
     
-    async def async_set_led(self, decice_id, status):
+    async def async_set_signal_light(self, decice_id, status):
         headers = self.headers.copy()
         headers['Content-Type'] = "application/json"
         data = data = {"deviceId":decice_id,"parameters":{"param":[{"name": "signalLight", "content": status}]}}
+
+        resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
+        return resp
+    
+    async def async_set_energy(self, decice_id, status):
+        headers = self.headers.copy()
+        headers['Content-Type'] = "application/json"
+        data = data = {"deviceId":decice_id,"parameters":{"param":[{"name": "energy", "content": status}]}}
 
         resp = await self.async_make_request_by_requests("POST", CONTROL_URL, data=data, headers=headers)
         return resp
